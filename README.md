@@ -1,93 +1,144 @@
 # nn-runtime-energy-measurement
 
+Measures per-inference **runtime**, **energy**, and **average power** for ONNX models on GPU and CPU using hardware energy counters.
 
+---
 
-## Getting started
+## Requirements
 
-To make it easy for you to get started with GitLab, here's a list of recommended next steps.
+| Script | Hardware | OS |
+|--------|----------|----|
+| `measure_gpu.py` | NVIDIA GPU (Maxwell or newer) | Linux |
+| `measure_cpu.py` | Intel CPU with RAPL | Linux |
 
-Already a pro? Just edit this README.md and make it your own. Want to make it easy? [Use the template at the bottom](#editing-this-readme)!
+```bash
+# GPU
+pip install -r requirements_gpu.txt
 
-## Add your files
+# CPU
+pip install -r requirements_cpu.txt
+```
 
-* [Create](https://docs.gitlab.com/user/project/repository/web_editor/#create-a-file) or [upload](https://docs.gitlab.com/user/project/repository/web_editor/#upload-a-file) files
-* [Add files using the command line](https://docs.gitlab.com/topics/git/add_files/#add-files-to-a-git-repository) or push an existing Git repository with the following command:
+---
+
+## GPU — `measure_gpu.py`
+
+### Energy measurement
+
+- **Primary:** `nvmlDeviceGetTotalEnergyConsumption()` — hardware energy counter (mJ resolution), used automatically when supported.
+- **Fallback:** background thread polls `nvmlDeviceGetPowerUsage()` at `--power_sample_dt` intervals and integrates with the trapezoidal rule.
+
+Net energy per inference subtracts idle baseline power:
 
 ```
-cd existing_repo
-git remote add origin https://gitlab.lrz.de/00000000014B4B11/nn-runtime-energy-measurement.git
-git branch -M main
-git push -uf origin main
+net_energy = gross_energy / n_runs  −  baseline_power × runtime / n_runs
 ```
 
-## Integrate with your tools
+### Usage
 
-* [Set up project integrations](https://gitlab.lrz.de/00000000014B4B11/nn-runtime-energy-measurement/-/settings/integrations)
+```bash
+# Direct
+python measure_gpu.py --models_dir /path/to/models --gpu_index 0
 
-## Collaborate with your team
+# With IOBinding (recommended for layer-by-layer sub-model benchmarks)
+python measure_gpu.py --models_dir /path/to/models --gpu_index 0 --iobinding
 
-* [Invite team members and collaborators](https://docs.gitlab.com/user/project/members/)
-* [Create a new merge request](https://docs.gitlab.com/user/project/merge_requests/creating_merge_requests/)
-* [Automatically close issues from merge requests](https://docs.gitlab.com/user/project/issues/managing_issues/#closing-issues-automatically)
-* [Enable merge request approvals](https://docs.gitlab.com/user/project/merge_requests/approvals/)
-* [Set auto-merge](https://docs.gitlab.com/user/project/merge_requests/auto_merge/)
+# Via wrapper (auto-sets LD_LIBRARY_PATH for CUDA libraries)
+bash run_measurement_gpu.sh --models_dir /path/to/models --gpu_index 0
+```
 
-## Test and Deploy
+> **Do not set `CUDA_VISIBLE_DEVICES`.** NVML uses physical device indices and ignores that variable. Use `--gpu_index <N>` to target the same physical device for both ORT and NVML.
 
-Use the built-in continuous integration in GitLab.
+### Arguments
 
-* [Get started with GitLab CI/CD](https://docs.gitlab.com/ci/quick_start/)
-* [Analyze your code for known vulnerabilities with Static Application Security Testing (SAST)](https://docs.gitlab.com/user/application_security/sast/)
-* [Deploy to Kubernetes, Amazon EC2, or Amazon ECS using Auto Deploy](https://docs.gitlab.com/topics/autodevops/requirements/)
-* [Use pull-based deployments for improved Kubernetes management](https://docs.gitlab.com/user/clusters/agent/)
-* [Set up protected environments](https://docs.gitlab.com/ci/environments/protected_environments/)
+| Argument | Default | Description |
+|----------|---------|-------------|
+| `--models_dir` | *(required)* | Directory containing `.onnx` files |
+| `--output_csv` | `output/output_<dir>_<timestamp>.csv` | Output CSV path |
+| `--gpu_index` | `0` | Physical GPU index (used by both ORT and NVML) |
+| `--warmup_duration` | `3.0` | Warm-up duration in seconds |
+| `--silence_duration` | `3.0` | Idle duration in seconds for baseline power measurement |
+| `--measure_duration` | `3.0` | Measurement duration in seconds |
+| `--power_sample_dt` | `0.01` | Sampling interval (s) for fallback power integration |
+| `--iobinding` | off | Keep output tensors on GPU, eliminating PCIe transfer overhead |
+| `--override_hw H W` | off | Override H and W for all 4-D model inputs |
+| `--recursive` | off | Search sub-directories for `.onnx` files |
+| `--verbose` | off | Print input shapes and debug information |
 
-***
+---
 
-# Editing this README
+## CPU — `measure_cpu.py`
 
-When you're ready to make this README your own, just edit this file and use the handy template below (or feel free to structure it however you want - this is just a starting point!). Thanks to [makeareadme.com](https://www.makeareadme.com/) for this template.
+### Energy measurement
 
-## Suggestions for a good README
+Reads the Linux RAPL hardware energy counter:
 
-Every project is different, so consider which of these sections apply to yours. The sections used in the template are suggestions for most open source projects. Also keep in mind that while a README can be too long and detailed, too long is better than too short. If you think your README is too long, consider utilizing another form of documentation rather than cutting out information.
+```
+/sys/class/powercap/intel-rapl/intel-rapl:<package>/energy_uj
+```
 
-## Name
-Choose a self-explaining name for your project.
+Counter wrap-around is handled automatically. Net energy uses the same baseline-subtraction formula as the GPU script.
 
-## Description
-Let people know what your project can do specifically. Provide context and add a link to any reference visitors might be unfamiliar with. A list of Features or a Background subsection can also be added here. If there are alternatives to your project, this is a good place to list differentiating factors.
+### RAPL permissions
 
-## Badges
-On some READMEs, you may see small images that convey metadata, such as whether or not all the tests are passing for the project. You can use Shields to add some to your README. Many services also have instructions for adding a badge.
+The energy counter file is root-readable by default. Grant access with:
 
-## Visuals
-Depending on what you are making, it can be a good idea to include screenshots or even a video (you'll frequently see GIFs rather than actual videos). Tools like ttygif can help, but check out Asciinema for a more sophisticated method.
+```bash
+sudo chmod o+r /sys/class/powercap/intel-rapl/intel-rapl:0/energy_uj
+```
 
-## Installation
-Within a particular ecosystem, there may be a common way of installing things, such as using Yarn, NuGet, or Homebrew. However, consider the possibility that whoever is reading your README is a novice and would like more guidance. Listing specific steps helps remove ambiguity and gets people to using your project as quickly as possible. If it only runs in a specific context like a particular programming language version or operating system or has dependencies that have to be installed manually, also add a Requirements subsection.
+### Usage
 
-## Usage
-Use examples liberally, and show the expected output if you can. It's helpful to have inline the smallest example of usage that you can demonstrate, while providing links to more sophisticated examples if they are too long to reasonably include in the README.
+```bash
+# Direct
+python measure_cpu.py --models_dir /path/to/models --rapl_package 0 --num_threads 1
 
-## Support
-Tell people where they can go to for help. It can be any combination of an issue tracker, a chat room, an email address, etc.
+# Pin to cores on the same NUMA node as the RAPL package (reduces cross-socket noise)
+taskset -c 0-7 python measure_cpu.py --models_dir /path/to/models --rapl_package 0
 
-## Roadmap
-If you have ideas for releases in the future, it is a good idea to list them in the README.
+# Via wrapper
+bash run_measurement_cpu.sh --models_dir /path/to/models --rapl_package 0
+```
 
-## Contributing
-State if you are open to contributions and what your requirements are for accepting them.
+### Arguments
 
-For people who want to make changes to your project, it's helpful to have some documentation on how to get started. Perhaps there is a script that they should run or some environment variables that they need to set. Make these steps explicit. These instructions could also be useful to your future self.
+| Argument | Default | Description |
+|----------|---------|-------------|
+| `--models_dir` | *(required)* | Directory containing `.onnx` files |
+| `--output_csv` | `output/output_cpu_<dir>_<timestamp>.csv` | Output CSV path |
+| `--rapl_package` | `0` | RAPL package index (corresponds to CPU socket) |
+| `--num_threads` | `10` | ORT intra/inter-op thread count |
+| `--warmup_duration` | `3.0` | Warm-up duration in seconds |
+| `--silence_duration` | `3.0` | Idle duration in seconds for baseline power measurement |
+| `--measure_duration` | `3.0` | Measurement duration in seconds |
+| `--override_hw H W` | off | Override H and W for all 4-D model inputs |
+| `--recursive` | off | Search sub-directories for `.onnx` files |
+| `--verbose` | off | Print input shapes and debug information |
 
-You can also document commands to lint the code or run tests. These steps help to ensure high code quality and reduce the likelihood that the changes inadvertently break something. Having instructions for running tests is especially helpful if it requires external setup, such as starting a Selenium server for testing in a browser.
+---
 
-## Authors and acknowledgment
-Show your appreciation to those who have contributed to the project.
+## Output
 
-## License
-For open source projects, say how it is licensed.
+Both scripts produce identical CSV columns:
 
-## Project status
-If you have run out of energy or time for your project, put a note at the top of the README saying that development has slowed down or stopped completely. Someone may choose to fork your project or volunteer to step in as a maintainer or owner, allowing your project to keep going. You can also make an explicit request for maintainers.
+| Column | Unit | Description |
+|--------|------|-------------|
+| `date_time` | — | Measurement timestamp |
+| `model_name` | — | `.onnx` filename |
+| `runtime_perinf_sec` | s | Mean wall-clock time per inference |
+| `net_energy_perinf_joule` | J | Mean energy per inference (baseline-subtracted) |
+| `net_averagepower_perinf_watt` | W | `net_energy / runtime` |
+| `energy_perinf_joule` | J | Mean gross energy per inference |
+| `averagepower_perinf_watt` | W | `gross_energy / runtime` |
+| `baseline_power_watt` | W | Idle power measured during silence window |
+| `silence_avg_temp_c` | °C | GPU temperature during silence (GPU only; NaN for CPU) |
+| `inference_avg_temp_c` | °C | GPU temperature during inference (GPU only; NaN for CPU) |
+
+---
+
+## Notes
+
+- **Core pinning:** use `taskset -c <cores>` to reduce OS scheduling noise. For CPU measurements, pin to cores on the same socket as the RAPL package being read.
+- **IOBinding:** use `--iobinding` when benchmarking layer-by-layer sub-models to eliminate PCIe transfer overhead from the measurement.
+- **Dynamic shapes:** unresolved symbolic dimensions are filled with defaults (`batch=1`, `H=224`, `W=224`). Use `--override_hw` to match the actual inference input size.
+- **Measure duration:** aim for at least 100 inference passes to reduce run-to-run jitter. Increase `--measure_duration` for large or slow models.
