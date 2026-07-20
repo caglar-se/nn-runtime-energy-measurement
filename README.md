@@ -101,18 +101,24 @@ All three scripts write the same CSV columns:
 
 ---
 
+## Test data & models (for `table1`/`table2` reproduction)
+
+- **VTM (NNVC) source**: `git clone https://vcgit.hhi.fraunhofer.de/jvet-ahg-nnvc/VVCSoftware_VTM.git`, then build (see the `Prerequisites` comment at the top of each `run_measurements.sh`). Ships with its own `cfg/CTC_JPEGAI/kodim19_512x768_8bit_420.cfg` and `cfg/encoder_intra_nnvc.cfg`.
+- **kodim19 test image**: bundled in this repo at [`data/kodim19_512x768_8bit_420.yuv`](data/kodim19_512x768_8bit_420.yuv) — both `run_measurements.sh` scripts point `INPUT_YUV` there by default.
+- **LOP7 ONNX model**: [download link](https://tumde-my.sharepoint.com/:u:/g/personal/serdar_caglar_tum_de/IQBNh_HDZQZ4TplNY-bEDpcaAT8Njez7VgPjbEZJY9Y7uVU?e=UGHxEe) — place `lop7_full_model.onnx` in its own directory and point `LOP7_MODEL_DIR` at it.
+
+---
+
 ## Examples
 
 - **`nvidiagpu-amdcpu/table1/`** — reproduces Table 1 (NVIDIA GPU + AMD CPU): decoder LOP7 off/on, plus isolated LOP7 on CPU and GPU.
   ```bash
-  bash nvidiagpu-amdcpu/table1/run_measurements.sh   # edit paths at the top first
+  bash nvidiagpu-amdcpu/table1/run_measurements.sh   # edit VTM_DIR / LOP7_MODEL_DIR at the top first
   ```
 - **`macbook/table2/`** — reproduces Table 2 (Apple Silicon, CPU only — no discrete GPU): same decoder measurement, plus isolated LOP7 on CPU via `measure_cpu_macos.py`.
   ```bash
-  bash macbook/table2/run_measurements.sh   # edit paths at the top first
+  bash macbook/table2/run_measurements.sh   # edit VTM_DIR / LOP7_MODEL_DIR at the top first
   ```
-
-Each script runs its measurement steps in order, then prints and saves the aggregated table (overhead, N× single-patch, ratios).
 
 ---
 

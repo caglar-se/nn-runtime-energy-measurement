@@ -15,12 +15,20 @@
 #
 # Prerequisites
 # -------------
-# 1. VTM NNVC binary built for macOS/arm64 (EncoderAppStatic, DecoderAppStatic) —
+# 1. VTM NNVC source, built for macOS/arm64 (EncoderAppStatic, DecoderAppStatic):
+#      git clone https://vcgit.hhi.fraunhofer.de/jvet-ahg-nnvc/VVCSoftware_VTM.git
+#      cd VVCSoftware_VTM
 #      cmake -DCMAKE_BUILD_TYPE=Release -B build_mac
 #      cmake --build build_mac -j$(sysctl -n hw.logicalcpu)
-#    then copy the built binaries into <VTM_DIR>/bin/.
-# 2. kodim19 input YUV and matching sequence config (.cfg) available.
-# 3. LOP7 ONNX model file in a dedicated directory.
+#    then copy the built binaries into <VTM_DIR>/bin/. This repo (cfg/CTC_JPEGAI/
+#    kodim19_512x768_8bit_420.cfg, cfg/encoder_intra_nnvc.cfg) ships with the
+#    NNVC ad-hoc group's own config set already.
+# 2. kodim19 input YUV — bundled in this repo at data/kodim19_512x768_8bit_420.yuv
+#    (INPUT_YUV below already points there by default).
+# 3. LOP7 ONNX model:
+#      https://tumde-my.sharepoint.com/:u:/g/personal/serdar_caglar_tum_de/IQBNh_HDZQZ4TplNY-bEDpcaAT8Njez7VgPjbEZJY9Y7uVU?e=UGHxEe
+#    Download and place lop7_full_model.onnx in its own directory, then point
+#    LOP7_MODEL_DIR below at that directory.
 # 4. Passwordless sudo for powermetrics:
 #      sudo sh -c 'echo "'"$USER"' ALL=(ALL) NOPASSWD: /usr/bin/powermetrics" \
 #        > /etc/sudoers.d/powermetrics && chmod 440 /etc/sudoers.d/powermetrics'
@@ -45,11 +53,11 @@ caffeinate -dimsu -w $$ &
 # *** EDIT THESE VARIABLES TO MATCH YOUR SYSTEM ***
 # ---------------------------------------------------------------------------
 
-VTM_DIR=/Users/serdarcaglar/workspace/nn_energy/jvet-jul26/VVCSoftware_VTM
-INPUT_YUV=/Users/serdarcaglar/workspace/nn_energy/jvet-jul26/VVCSoftware_VTM/CTC_Image/yuv_output_ctc/kodim19_512x768_8bit_420.yuv
+VTM_DIR=/path/to/VVCSoftware_VTM
+INPUT_YUV="$(cd "$(dirname "$0")/../.." && pwd)/data/kodim19_512x768_8bit_420.yuv"
 BASE_CFG=cfg/encoder_intra_nnvc.cfg
 SEQ_CFG=cfg/CTC_JPEGAI/kodim19_512x768_8bit_420.cfg
-LOP7_MODEL_DIR=/Users/serdarcaglar/workspace/nn_energy/jvet-jul26/models/NN_Filtering_Models_onnx/LOP7
+LOP7_MODEL_DIR=/path/to/dir_containing_lop7.onnx
 
 N_RUNS=10
 

@@ -14,9 +14,16 @@
 #
 # Prerequisites
 # -------------
-# 1. VTM NNVC binary built (EncoderAppStatic, DecoderAppStatic).
-# 2. kodim19 input YUV and matching sequence config (.cfg) available.
-# 3. LOP7 ONNX model file in a dedicated directory.
+# 1. VTM NNVC source, built (EncoderAppStatic, DecoderAppStatic):
+#      git clone https://vcgit.hhi.fraunhofer.de/jvet-ahg-nnvc/VVCSoftware_VTM.git
+#    This repo (cfg/CTC_JPEGAI/kodim19_512x768_8bit_420.cfg, cfg/encoder_intra_nnvc.cfg)
+#    ships with the NNVC ad-hoc group's own config set already.
+# 2. kodim19 input YUV — bundled in this repo at data/kodim19_512x768_8bit_420.yuv
+#    (INPUT_YUV below already points there by default).
+# 3. LOP7 ONNX model:
+#      https://tumde-my.sharepoint.com/:u:/g/personal/serdar_caglar_tum_de/IQBNh_HDZQZ4TplNY-bEDpcaAT8Njez7VgPjbEZJY9Y7uVU?e=UGHxEe
+#    Download and place lop7_full_model.onnx in its own directory, then point
+#    LOP7_MODEL_DIR below at that directory.
 # 4. RAPL energy counter readable:
 #      sudo chmod o+r /sys/class/powercap/intel-rapl/intel-rapl:<package>/energy_uj
 # 5. GPU packages installed:  pip install -r requirements_gpu.txt
@@ -33,7 +40,7 @@ set -euo pipefail
 # ---------------------------------------------------------------------------
 
 VTM_DIR=/path/to/VVCSoftware_VTM
-INPUT_YUV=/path/to/kodim19_512x768_8bit_420.yuv
+INPUT_YUV="$(cd "$(dirname "$0")/../.." && pwd)/data/kodim19_512x768_8bit_420.yuv"
 BASE_CFG=cfg/encoder_intra_nnvc.cfg
 SEQ_CFG=cfg/CTC_JPEGAI/kodim19_512x768_8bit_420.cfg
 LOP7_MODEL_DIR=/path/to/dir_containing_lop7.onnx
