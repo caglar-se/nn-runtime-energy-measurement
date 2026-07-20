@@ -2,6 +2,11 @@
 
 Measures per-inference **runtime**, **energy**, and **average power** for ONNX models on GPU and CPU using hardware energy counters.
 
+These scripts were developed for and used in the following JVET contribution:
+
+> **Runtime and Energy Consumption Estimation for Neural Network-based In-loop Filters in NNVC**  
+> https://jvet-experts.org/index.php?document=17130
+
 ---
 
 ## Requirements
@@ -133,6 +138,22 @@ Both scripts produce identical CSV columns:
 | `baseline_power_watt` | W | Idle power measured during silence window |
 | `silence_avg_temp_c` | °C | GPU temperature during silence (GPU only; NaN for CPU) |
 | `inference_avg_temp_c` | °C | GPU temperature during inference (GPU only; NaN for CPU) |
+
+---
+
+## Examples
+
+**`nvidiagpu-amdcpu/table1/`** — reproduces Table 1 from the JVET contribution: NNVC decoder
+measurements (LOP7 off / on) combined with isolated LOP7 ONNX inference on CPU and GPU.
+
+```bash
+# Edit the path variables at the top of the script, then run from the repo root:
+bash nvidiagpu-amdcpu/table1/run_measurements.sh
+```
+
+The script runs four steps: decoder measurements (both LOP7 conditions), CPU ONNX
+measurements, GPU ONNX measurements, and a final aggregation step that prints the
+complete table including derived rows (overhead, 24× single patch, ratios).
 
 ---
 
